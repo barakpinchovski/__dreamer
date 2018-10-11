@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en" class="expand close">
+<head>
+    <meta charset="UTF-8">
+    <title>HTML Interpreter Input</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <style>
+        .expand { height: 100%; }
+        .close { border: none; margin: 0; padding: 0; }
+        form { width: 100%; }
+        label { font-family: "Segoe UI"; }
+        html, body, textarea { overflow: hidden; font-size: 20px; }
+        textarea {
+            overflow-y: scroll;
+            color: #005656;
+            background: #cceeee;
+            float: left;
+            transition: 0.1s ease-out;
+        }
+        textarea.css { color: #004084; background: #daecff; }
+        textarea.js { color: #9e4300; background-color: #fff0dd; }
+        section {
+            display: inline-block;
+            float: left;
+            height: 100%;
+            position: relative;
+            width: fit-content;
+        }
+        section::after {
+            opacity: 0.07;
+            font-family: "Segoe UI";
+            font-weight: bold;
+            display: block;
+            position: absolute;
+            right: 20px;
+            bottom: 0;
+            font-size: 50px;
+        }
+        section#html::after { content: 'HTML'; color: #005656;}
+        section#css::after { content: 'CSS'; color: #004084; }
+        section#js::after { content: 'JavaScript'; color: #191000; }
+        section.hidden::after { display: none; }
+        .textarea-properties {
+            position: absolute;
+            top: 0;
+            right: 0;
+            opacity: 0.6;
+            width: fit-content;
+            height: 30px;
+            border-radius: 20px;
+            text-align: center;
+            padding: 0 6px;
+        }
+        .textarea-properties i { cursor: pointer; transition: 0.1s ease-out; }
+        .textarea-properties i:hover { transform: scale(1.2); }
+        .textarea-properties.html {
+            color: #005656;
+            background-color: #d7fffb;
+        }
+        .textarea-properties.css {
+            color: #004084;
+            background-color: #eff7ff; ;
+        }
+        .textarea-properties.js {
+            color: orange;
+            background-color: #ffffff;
+        }
+        .textarea-properties .disabled {
+            color: dimgray;
+        }
+        .fa-eye.disabled { position: absolute; left: -6px; opacity: 0.8; }
+        .fa-eye.disabled + label { display: none; }
+        .html .fa-eye.disabled:after { content: 'HTML'; display: block; position: absolute; left: -3px; top: 20px; font-size: 12px; color: #005656; }
+        .css .fa-eye.disabled:after { content: 'CSS'; display: block; position: absolute; left: -3px; top: 20px; font-size: 12px; color: #004084; }
+        .js .fa-eye.disabled:after { content: 'JS'; display: block; position: absolute; left: -3px; top: 20px; font-size: 12px; color: orange; }
+    </style>
+    <script>
+        const TAB_KEYCODE = 9;
+        var outputFrameDocContent;
+        var htmlTextarea, cssTextarea, jsTextarea, styleElement, scriptElement, htmlHeadContent, htmlBodyContent;
+        var allTextareas;
+        var attachedFiles = {
+            'css': false,
+            'js': false
+        };
+
+        window.onload = function() {
+            outputFrameDocContent = parent.window.document.children[0].children[1].children[1].contentDocument;
+            htmlTextarea = document.querySelector('textarea.html');
+            cssTextarea = document.querySelector('textarea.css');
+            jsTextarea = document.querySelector('textarea.js');
+            var boundwidth = document.getElementsByTagName('form')[0].getBoundingClientRect().width;
+
+            htmlTextarea.style.width = boundwidth * 0.375 + "px";
+            jsTextarea.style.width = boundwidth * 0.375 + "px";
+            cssTextarea.style.width = boundwidth * 0.25 + "px";
+
+            allTextareas = {
+                'html': htmlTextarea,
+                'css': cssTextarea,
+                'js': jsTextarea
+            };
+        };
+
+        document.onkeydown = function(e) {
+                if (e.keyCode === TAB_KEYCODE) {
+                    e.preventDefault();
+                }
+        };
+        document.onkeyup = function(e) {
+            if (e.keyCode === TAB_KEYCODE) {
+                var startPos = htmlTextarea.selectionStart;
+                htmlTextarea.value = htmlTextarea.value.substring(0, startPos)
+                    + '\t'
+                    + htmlTextarea.value.substring(startPos, htmlTextarea.value.length);
+                htmlTextarea.selectionEnd = startPos;
+            }
+
+            htmlHeadContent = htmlTextarea.value.substring(htmlTextarea.value.indexOf('<head>') + '<head>'.length, htmlTextarea.value.indexOf('</head>' ));
+            // CSS
+            if (attachedFiles['css'] && cssTextarea.value) {
+                // head
+                if (!styleElement) {
+                    styleElement = outputFrameDocContent.createElement('style');
+                }
+                styleElement.innerHTML = cssTextarea.value;
+                outputFrameDocContent.children[0].children[0].appendChild(styleElement);
+            }
+            else if (styleElement && !attachedFiles['css'] && outputFrameDocContent.children[0].children[0].contains(styleElement)) {
+                outputFrameDocContent.children[0].children[0].removeChild(styleElement);
+            }
+
+            // JAVASCRIPT
+            if (attachedFiles['js'] && jsTextarea.value) {
+                // head
+                if (outputFrameDocContent.children[0].children[0].contains(scriptElement)) {
+                    outputFrameDocContent.children[0].children[0].removeChild(scriptElement);
+                }
+                scriptElement = outputFrameDocContent.createElement('script');
+                scriptElement.innerHTML = jsTextarea.value;
+                outputFrameDocContent.children[0].children[0].appendChild(scriptElement);
+            }
+            else if (scriptElement && !attachedFiles['js'] && outputFrameDocContent.children[0].children[0].contains(scriptElement)) {
+                outputFrameDocContent.children[0].children[0].removeChild(scriptElement);
+                scriptElement = undefined;
+            }
+
+            htmlBodyContent = htmlTextarea.value.substring(htmlTextarea.value.indexOf('<body>') + '<body>'.length, htmlTextarea.value.indexOf('</body>' ));
+            outputFrameDocContent.children[0].children[1].innerHTML = htmlBodyContent;
+        };
+
+        function toggleTextarea(elm, type) {
+            elm.classList.toggle('disabled');
+            allTextareas[type].style.width = elm.classList.contains('disabled') ? '17px' : '100%';
+            allTextareas[type].parentElement.classList.toggle('hidden');
+        }
+
+        function toggleFile(elm, type) {
+            elm.classList.toggle('disabled');
+            attachedFiles[type] = !attachedFiles[type];
+
+            htmlHeadContent = htmlTextarea.value.substring(htmlTextarea.value.indexOf('<head>') + '<head>'.length, htmlTextarea.value.indexOf('</head>' ));
+            // Attached is true then add
+            if (attachedFiles[type]) {
+                if (type === 'css' && htmlHeadContent.indexOf('<link') === -1) {
+                    var startPos = htmlTextarea.value.indexOf('<head>') + '<head>'.length;
+                    htmlTextarea.value = htmlTextarea.value.substring(0, startPos) + '\n\t\t'
+                        + '<link rel="stylesheet" href="external.css"/>'
+                        + htmlTextarea.value.substring(startPos, htmlTextarea.value.length);
+                }
+                else if (type === 'js' && htmlHeadContent.indexOf('<script src="external.js"><\/script>') === -1) {
+                    var startPos = htmlTextarea.value.indexOf('<head>') + '<head>'.length;
+                    htmlTextarea.value = htmlTextarea.value.substring(0, startPos) + '\n\t\t'
+                        + '<script src="external.js"><\/script>'
+                        + htmlTextarea.value.substring(startPos, htmlTextarea.value.length);
+                }
+            }
+            // Not attached then remove
+            else if (!attachedFiles[type]) {
+                if (type === 'css' && htmlHeadContent.indexOf('\n\t\t<link') !== -1) {
+                    var startPos = htmlTextarea.value.indexOf('\n\t\t<link');
+                    htmlTextarea.value = htmlTextarea.value.substring(0, startPos)
+                        + htmlTextarea.value.substring(startPos + '\n\t\t<link rel="stylesheet" href="external.css"/>'.length, htmlTextarea.value.length);
+                }
+                else  if (type === 'js' && htmlTextarea.value.indexOf('\n\t\t<script src="external.js"><\/script>') !== -1) {
+                    var startPos = htmlTextarea.value.indexOf('\n\t\t<script src="external.js"><\/script>');
+                    htmlTextarea.value = htmlTextarea.value.substring(0, startPos)
+                        + htmlTextarea.value.substring(startPos + '\n\t\t<script src="external.js"><\/script>'.length, htmlTextarea.value.length);
+
+                    if(outputFrameDocContent.children[0].children[0].contains(scriptElement)) {
+                        outputFrameDocContent.children[0].children[0].removeChild(scriptElement);
+                    }
+                }
+            }
+            document.onkeyup({keyCode: false});
+        }
+
+        function resetHTML() {
+            const resetText = "<!DOCTYPE html>\n<html>\n\t<head>\n\t</head>\n\t<body>\n\n\t</body>\n</html>";
+            htmlTextarea.value = resetText;
+            outputFrameDocContent.children[0].children[1].innerHTML = resetText;
+        }
+
+        // @todo
+        function getPrevious() {}
+    </script>
+</head>
+<body class="expand close" >
+    <form class="expand close" name="f">
+        <section id="html" >
+            <div class="textarea-properties html">
+                <i class="fa fa-eye" onclick="toggleTextarea(this, 'html');" title="Toggle HTML Textarea"></i>
+                <i class="fa fa-refresh" onclick="resetHTML()" title="Reset HTML"></i>
+                <!--<i class="fa fa-undo" onclick="getPrevious()" title="Previous"></i>-->
+            </div>
+            <textarea class="html expand close" wrap="hard" spellcheck="false">
+<!DOCTYPE html>
+<html>
+        <head>
+        </head>
+        <body>
+
+        </body>
+</html>
+        </textarea>
+        </section>
+        <section id="css">
+            <div class="textarea-properties css">
+                <i class="fa fa-eye" onclick="toggleTextarea(this, 'css');" title="Toggle CSS Textarea"></i>
+                <label for="import-css"><i class="fa fa-file disabled" title="Toggle CSS File" onclick="toggleFile(this, 'css');"></i></label><input id="import-css" type="checkbox" hidden/>
+            </div>
+            <textarea class="css expand close" wrap="hard" spellcheck="false"></textarea>
+        </section>
+        <section id="js">
+            <div class="textarea-properties js">
+                <i class="fa fa-eye" onclick="toggleTextarea(this, 'js');" title="Toggle JS Textarea"></i>
+                <label for="import-js"><i class="fa fa-file disabled" title="Toggle JS File" onclick="toggleFile(this, 'js');"></i></label><input id="import-js" type="checkbox" hidden/>
+            </div>
+            <textarea class="js expand close" wrap="hard" spellcheck="false"></textarea>
+        </section>
+    </form>
+</body>
+</html>
